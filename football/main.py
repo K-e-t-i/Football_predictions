@@ -13,7 +13,7 @@ def main():
     # awayteam = input("Podaj nazwę drużyny grającej na wyjeździe: ")
 
     # load data from csv
-    football_data = pd.read_csv("data.csv", header=0, usecols=[0, 1, 2, 3, 4, 5],
+    football_data = pd.read_csv("datashort.csv", header=0, usecols=[0, 1, 2, 3, 4, 5],
                                 names=["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"])
 
     # create a list of teams
@@ -55,37 +55,27 @@ def main():
 
     # ------------------------------------------------------------------
 
-    team_A = "Liverpool"
-    team_B = "Fulham"
-    eff_H = []
-    eff_A = []
-    eff_D = []
+    team_A = "Fulham"
+    team_B = "Liverpool"
 
     for i in range(len(Sorted_Ranking)):
         if Sorted_Ranking[i][0] == team_A:
-            eff_AH = 0.9 - i * 0.03
-            eff_AA = 0.9 - i * 0.03
-            eff_AD = 0.6 + i * 0.01
+            eff_AH = 0.9 - i * 0.02
+            eff_AD = 0.4 + i * 0.01
             if Sorted_Ranking[i][2] > Sorted_Ranking[i][3]:
                 eff_AH += 0.05
-            elif Sorted_Ranking[i][2] < Sorted_Ranking[i][3]:
-                eff_AA += 0.05
 
         elif Sorted_Ranking[i][0] == team_B:
-            eff_BH = 0.9 - i * 0.03
-            eff_BA = 0.9 - i * 0.03
+            eff_BA = 0.9 - i * 0.02
             eff_BD = 0.6 + i * 0.01
-            if Sorted_Ranking[i][2] > Sorted_Ranking[i][3]:
-                eff_BH += 0.05
-            elif Sorted_Ranking[i][2] < Sorted_Ranking[i][3]:
+            if Sorted_Ranking[i][2] < Sorted_Ranking[i][3]:
                 eff_BA += 0.05
-    eff_H = [eff_AH, eff_BH]
-    eff_A = [eff_AA, eff_BA]
+
+    eff = [eff_AH, eff_BA]
     eff_D = [eff_AD, eff_BD]
 
-
     Teams_to_predict = [team_A, team_B]
-    Teams_Mateches = [0, 0]
+    Teams_Matches = [0, 0]
     for j in range(2):
         Matches = []
         for i in range(football_data.last_valid_index() + 1):
@@ -94,17 +84,21 @@ def main():
                     Matches.append(football_data["FTR"][i])
                 elif football_data["FTR"][i] == "D":
                     Matches.append(football_data["FTR"][i])
+                elif football_data["FTR"][i] == "A":
+                    Matches.append("L")
             elif football_data["AwayTeam"][i] == Teams_to_predict[j]:
                 if football_data["FTR"][i] == "A":
                     Matches.append(football_data["FTR"][i])
                 elif football_data["FTR"][i] == "D":
                     Matches.append(football_data["FTR"][i])
+                elif football_data["FTR"][i] == "H":
+                    Matches.append("L")
 
-        # Matches.reverse()
-        # del Matches[5:]
-        # Matches.reverse()
-        Teams_Mateches[j] = Matches
-    print(Teams_Mateches)
+        # 3 last matches: Last -> [0], One before last [1], Earlier [2]
+        Matches.reverse()
+        del Matches[3:]
+        Teams_Matches[j] = Matches
+    print(Teams_Matches)
 
     # Create the model with edges specified as tuples (parent, child)
     edges = []
@@ -122,14 +116,16 @@ def main():
     cpd_team = []
 
     for i in range(2):
-        cpd_run.append(TabularCPD('Run' + str(i), 2, [[0.95, 0.95, 0.6], [0.05, 0.05, 0.4]], evidence=['Team' + str(i)],
-                                  evidence_card=[3]))
+        cpd_run.append(TabularCPD('Run' + str(i), 3, [[0.75, 0.1], [0.05, 0.1], [0.2, 0.8]], evidence=['Team' + str(i)],
+                                  evidence_card=[2]))
+
         cpd_efficiency.append(
-            TabularCPD('Efficiency' + str(i), 2, [[eff_H[i], eff_A[i], eff_D[i]], [1-eff_H[i], 1-eff_A[i], 1-eff_D[i]]], evidence=['Team' + str(i)],
-                       evidence_card=[3]))
-        cpd_venue.append(TabularCPD('Venue' + str(i), 2, [[0.6, 0.4, 0.5], [0.4, 0.6, 0.5]], evidence=['Team' + str(i)],
-                                    evidence_card=[3]))
-        cpd_team.append(TabularCPD('Team' + str(i), 3, [[0.35], [0.35], [0.3]]))
+            TabularCPD('Efficiency' + str(i), 2, [[eff[i], eff_D[i]], [1 - eff[i], 1 - eff_D[i]]], evidence=['Team' + str(i)],
+                       evidence_card=[2]))
+
+        cpd_venue.append(TabularCPD('Venue' + str(i), 2, [[0.6, 0.4], [0.4, 0.6]], evidence=['Team' + str(i)],
+                                    evidence_card=[2]))
+        cpd_team.append(TabularCPD('Team' + str(i), 2, [[0.5], [0.5]]))
 
     # Add CPDs to model
     football_model.add_cpds(*cpd_run, *cpd_efficiency, *cpd_venue, *cpd_team)
@@ -139,23 +135,23 @@ def main():
     # Initialize inference algorithm
     football_infer = VariableElimination(football_model)
 
-    q0 = football_infer.query(['Team0'], evidence={'Efficiency0': 0, 'Run0': 1, 'Venue0': 0}, show_progress=False)
-    print('P(Team0|E0, R0, V0) =\n', q0)
-    home0 = q0.values[0]
-    draw0 = q0.values[2]
+    qA = football_infer.query(['Team0'], evidence={'Efficiency0': 0, 'Run0': 0, 'Venue0': 0}, show_progress=False)
+    print('P(Team0|E0, R0, V0) =\n', qA)
+    winA = qA.values[0]
+    drawA = qA.values[1]
 
-    q1 = football_infer.query(['Team1'], evidence={'Efficiency1': 0, 'Run1': 0, 'Venue1': 1}, show_progress=False)
-    print('P(Team1|E1, R1, V1) =\n', q1)
-    away1 = q1.values[1]
-    draw1 = q1.values[2]
+    qB = football_infer.query(['Team1'], evidence={'Efficiency1': 0, 'Run1': 0, 'Venue1': 1}, show_progress=False)
+    print('P(Team1|E1, R1, V1) =\n', qB)
+    winB = qB.values[0]
+    drawB = qB.values[1]
 
-    sub_draw = abs(draw0 - draw1)
+    sub = abs(winA - winB)
 
-    if sub_draw < 0.15 and draw0 > 0.4 and draw1 > 0.4:
+    if drawA > 0.4 and drawB > 0.4 or sub < 0.2:
         print("D")
-    elif home0 > away1:
+    elif winA > winB and sub > 0.2:
         print("H")
-    elif away1 > home0:
+    elif winB > winA and sub > 0.2:
         print("A")
 
 
