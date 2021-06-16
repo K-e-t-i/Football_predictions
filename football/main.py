@@ -7,10 +7,30 @@ from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
 
 
+def make_dictH(matches):
+    list_dictionaryH = {}
+    for i in range(4):
+        list_dictionaryH['Match0' + str(i)] = matches[0][i]
+    list_dictionaryH['Efficiency0'] = 0
+    list_dictionaryH['Venue0'] = 0
+    return list_dictionaryH
+
+
+def make_dictA(matches):
+    list_dictionaryA = {}
+    for i in range(4):
+        list_dictionaryA['Match1' + str(i)] = matches[1][i]
+    list_dictionaryA['Efficiency1'] = 0
+    list_dictionaryA['Venue1'] = 1
+    return list_dictionaryA
+
+
 def main():
-    # date = input("Podaj datę meczu: ")
-    # hometeam = input("Podaj nazwę drużyny gospodarzy: ")
-    # awayteam = input("Podaj nazwę drużyny grającej na wyjeździe: ")
+    date = input()
+    team_H = input()
+    team_A = input()
+
+    Teams_to_predict = [team_H, team_A]
 
     # load data from csv
     football_data = pd.read_csv("data.csv", header=0, usecols=[0, 1, 2, 3, 4, 5],
@@ -51,22 +71,19 @@ def main():
     # Create ranking [('TeamName', Goals, Losses)] sorted by goals and losses
     Half_Sorted_Ranking = sorted(Ranking, key=itemgetter(4), reverse=False)
     Sorted_Ranking = sorted(Half_Sorted_Ranking, key=itemgetter(1), reverse=True)
-    print(Sorted_Ranking)
+    # print(Sorted_Ranking)
 
     # ------------------------------------------------------------------
 
-    team_A = "Fulham"
-    team_B = "Liverpool"
-
     # create efficiency prob
     for i in range(len(Sorted_Ranking)):
-        if Sorted_Ranking[i][0] == team_A:
+        if Sorted_Ranking[i][0] == Teams_to_predict[0]:
             eff_AH = 0.9 - i * 0.02
             eff_AD = 0.4 + i * 0.01
             if Sorted_Ranking[i][2] > Sorted_Ranking[i][3]:
                 eff_AH += 0.05
 
-        elif Sorted_Ranking[i][0] == team_B:
+        elif Sorted_Ranking[i][0] == Teams_to_predict[1]:
             eff_BA = 0.9 - i * 0.02
             eff_BD = 0.6 + i * 0.01
             if Sorted_Ranking[i][2] < Sorted_Ranking[i][3]:
@@ -76,31 +93,30 @@ def main():
     eff_D = [eff_AD, eff_BD]
 
     # read results 4 last team matches
-    Teams_to_predict = [team_A, team_B]
     Teams_Matches = [0, 0]
     for j in range(2):
         Matches = []
         for i in range(football_data.last_valid_index() + 1):
             if football_data["HomeTeam"][i] == Teams_to_predict[j]:
                 if football_data["FTR"][i] == "H":
-                    Matches.append(football_data["FTR"][i])
+                    Matches.append(0)
                 elif football_data["FTR"][i] == "D":
-                    Matches.append(football_data["FTR"][i])
+                    Matches.append(2)
                 elif football_data["FTR"][i] == "A":
-                    Matches.append("L")
+                    Matches.append(1)
             elif football_data["AwayTeam"][i] == Teams_to_predict[j]:
                 if football_data["FTR"][i] == "A":
-                    Matches.append(football_data["FTR"][i])
+                    Matches.append(0)
                 elif football_data["FTR"][i] == "D":
-                    Matches.append(football_data["FTR"][i])
+                    Matches.append(2)
                 elif football_data["FTR"][i] == "H":
-                    Matches.append("L")
+                    Matches.append(1)
 
         # 4 last matches: Last -> [0], One before last [1], Earlier [2], The Earliest [3]
         Matches.reverse()
         del Matches[4:]
         Teams_Matches[j] = Matches
-    print(Teams_Matches)
+    # print(Teams_Matches)
 
     # ------------------------------------------------------------------
 
@@ -132,40 +148,42 @@ def main():
                        evidence=['Team' + str(i)],
                        evidence_card=[2]))
 
-        cpd_venue.append(TabularCPD('Venue' + str(i), 2, [[0.6, 0.4], [0.4, 0.6]], evidence=['Team' + str(i)],
+        cpd_venue.append(TabularCPD('Venue' + str(i), 2, [[0.55, 0.45], [0.45, 0.55]], evidence=['Team' + str(i)],
                                     evidence_card=[2]))
         cpd_team.append(TabularCPD('Team' + str(i), 2, [[0.5], [0.5]]))
 
         for j in range(4):
             cpd_match.append(
-                TabularCPD('Match' + str(i) + str(j), 3, [[0.7, 0.1, 0.3], [0.1, 0.6, 0.3], [0.2, 0.3, 0.4]], evidence=['Run' + str(i)],
+                TabularCPD('Match' + str(i) + str(j), 3,
+                           [[0.6 - i * 0.05, 0.1 + i * 0.05, 0.3], [0.2 + i * 0.05, 0.6 - i * 0.05, 0.3],
+                            [0.2, 0.3, 0.4]],
+                           evidence=['Run' + str(i)],
                            evidence_card=[3]))
 
     # Add CPDs to model
     football_model.add_cpds(*cpd_run, *cpd_efficiency, *cpd_venue, *cpd_team, *cpd_match)
 
-    print('Check model :', football_model.check_model())
+    # print('Check model :', football_model.check_model())
 
     # Initialize inference algorithm
     football_infer = VariableElimination(football_model)
 
-    qA = football_infer.query(['Team0'], evidence={'Efficiency0': 0, 'Venue0': 0, 'Match00': 1, 'Match01': 1, 'Match02': 1, 'Match03': 2}, show_progress=False)
-    print('P(Team0|E0, R0, V0) =\n', qA)
+    qH = football_infer.query(['Team0'], evidence=make_dictH(Teams_Matches), show_progress=False)
+    winH = qH.values[0]
+    drawH = qH.values[1]
+
+    qA = football_infer.query(['Team1'], evidence=make_dictA(Teams_Matches), show_progress=False)
     winA = qA.values[0]
     drawA = qA.values[1]
 
-    qB = football_infer.query(['Team1'], evidence={'Efficiency1': 0, 'Venue1': 1, 'Match10': 1, 'Match11': 0, 'Match12': 0, 'Match13': 2}, show_progress=False)
-    print('P(Team1|E1, R1, V1) =\n', qB)
-    winB = qB.values[0]
-    drawB = qB.values[1]
+    sub = abs(winH - winA)
 
-    sub = abs(winA - winB)
-
-    if drawA > 0.4 and drawB > 0.4 or sub < 0.2:
+    # preset results
+    if drawH > 0.4 and drawA > 0.4 or sub < 0.15:
         print("D")
-    elif winA > winB and sub > 0.2:
+    elif winH > winA and sub > 0.15:
         print("H")
-    elif winB > winA and sub > 0.2:
+    elif winA > winH and sub > 0.15:
         print("A")
 
 
