@@ -6,6 +6,16 @@ from pgmpy.models import BayesianModel
 from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
 
+# TODO Jakość kodu (1.5/2)
+
+# TODO Skuteczność 0.430 (0.5/3)
+# TODO [0.56, 1.00] - 3.0
+# TODO [0.53, 0.56) - 2.5
+# TODO [0.50, 0.53) - 2.0
+# TODO [0.47, 0.50) - 1.5
+# TODO [0.44, 0.47) - 1.0
+# TODO [0.41, 0.44) - 0.5
+# TODO [0.00, 0.41) - 0.0
 
 def make_dictH(matches):
     list_dictionaryH = {}
@@ -76,6 +86,7 @@ def main():
     # ------------------------------------------------------------------
 
     # create efficiency prob
+    # TODO Przydałby się komentarz. Co to jest "eff_D"?
     for i in range(len(Sorted_Ranking)):
         if Sorted_Ranking[i][0] == Teams_to_predict[0]:
             eff_AH = 0.9 - i * 0.02
@@ -119,6 +130,8 @@ def main():
     # print(Teams_Matches)
 
     # ------------------------------------------------------------------
+    # TODO Model i dobór parametrów (2/5)
+    # TODO Czy krawędzie w drugą stronę nie byłyby bardziej intuicyjne?
 
     # Create the model with edges specified as tuples (parent, child)
     edges = []
@@ -168,6 +181,7 @@ def main():
     # Initialize inference algorithm
     football_infer = VariableElimination(football_model)
 
+    # TODO Co oznaczają zmienne 'Efficiency' i 'Venue' jeśli nie są obserwowane?
     qH = football_infer.query(['Team0'], evidence=make_dictH(Teams_Matches), show_progress=False)
     winH = qH.values[0]
     drawH = qH.values[1]
