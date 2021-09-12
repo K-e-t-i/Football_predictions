@@ -14,6 +14,9 @@ Użytkownik na standardowe wejście podaje 3 łańcuchy znaków oddzielone znaka
 
 Po określeniu skuteczności drużyn na podstawie wyników z poprzednich spotkań, rozważana jest również pozycja w rankingu. Jest on tworzony na podstawie wszystkich goli zdobytych przez daną drużynę. Dzięki niemu, zawodnicy na czele rankinu mają większe prawdopodobieństwo na zwycięstwo, a ich pojedyncze porażki nie wpływają tak mocno na końcową predykcję. 
 
+![Graph2](schemat.png)
+
+Ostateczny wynik meczu określany jest na podstawie porównania skuteczności obu drużyn. Jeśli ich różnica nie przekracza 0.8 to na wyjściu pojawia się informacja o remisie (D). W przeciwnym wypadku wyświetlana jest informacja o zwycięstwie skuteczniejszej drużyny: gospodarzy (H) lub gości (A).
 
 # Podsumowanie
 
