@@ -6,34 +6,6 @@ from pgmpy.models import BayesianModel
 from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
 
-# TODO Jakość kodu (1.5/2)
-
-# TODO Skuteczność 0.430 (0.5/3)
-# TODO [0.56, 1.00] - 3.0
-# TODO [0.53, 0.56) - 2.5
-# TODO [0.50, 0.53) - 2.0
-# TODO [0.47, 0.50) - 1.5
-# TODO [0.44, 0.47) - 1.0
-# TODO [0.41, 0.44) - 0.5
-# TODO [0.00, 0.41) - 0.0
-
-def make_dictH(matches):
-    list_dictionaryH = {}
-    for i in range(4):
-        list_dictionaryH['Match0' + str(i)] = matches[0][i]
-    list_dictionaryH['Efficiency0'] = 0
-    list_dictionaryH['Venue0'] = 0
-    return list_dictionaryH
-
-
-def make_dictA(matches):
-    list_dictionaryA = {}
-    for i in range(4):
-        list_dictionaryA['Match1' + str(i)] = matches[1][i]
-    list_dictionaryA['Efficiency1'] = 0
-    list_dictionaryA['Venue1'] = 1
-    return list_dictionaryA
-
 
 def main():
     date = input()
@@ -45,63 +17,6 @@ def main():
     # load data from csv
     football_data = pd.read_csv("data.csv", header=0, usecols=[0, 1, 2, 3, 4, 5],
                                 names=["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR"])
-
-    # create a list of teams
-    Teams = []
-    team_list = football_data.copy()
-    team_list.sort_values(["HomeTeam"], inplace=True)
-    team_list.drop_duplicates(subset=['HomeTeam'], keep='last', inplace=True)
-    team_list.reset_index(inplace=True)
-    for i in range(team_list.last_valid_index() + 1):
-        Teams.append(team_list["HomeTeam"][i])
-
-    # counting team's goals and results
-    Ranking = []
-
-    # loop for Teams
-    for j in range(team_list.last_valid_index() + 1):
-        goals_home = 0
-        goals_away = 0
-        losses_home = 0
-        losses_away = 0
-        # loop for football_data
-        for i in range(football_data.last_valid_index() + 1):
-            if football_data["HomeTeam"][i] == Teams[j]:
-                goals_home += (football_data["FTHG"][i])
-                losses_home += (football_data["FTAG"][i])
-            elif football_data["AwayTeam"][i] == Teams[j]:
-                goals_away += (football_data["FTAG"][i])
-                losses_away += (football_data["FTHG"][i])
-        # counting team's goals ans losses
-        goals = goals_home + goals_away
-        losses = losses_home + losses_away
-        # Ranking = [name, G, GH, GA, L, LH, LA]
-        Ranking.append((Teams[j], goals, goals_home, goals_away, losses, losses_home, losses_away))
-
-    # Create ranking [('TeamName', Goals, Losses)] sorted by goals and losses
-    Half_Sorted_Ranking = sorted(Ranking, key=itemgetter(4), reverse=False)
-    Sorted_Ranking = sorted(Half_Sorted_Ranking, key=itemgetter(1), reverse=True)
-    # print(Sorted_Ranking)
-
-    # ------------------------------------------------------------------
-
-    # create efficiency prob
-    # TODO Przydałby się komentarz. Co to jest "eff_D"?
-    for i in range(len(Sorted_Ranking)):
-        if Sorted_Ranking[i][0] == Teams_to_predict[0]:
-            eff_AH = 0.9 - i * 0.02
-            eff_AD = 0.4 + i * 0.01
-            if Sorted_Ranking[i][2] > Sorted_Ranking[i][3]:
-                eff_AH += 0.05
-
-        elif Sorted_Ranking[i][0] == Teams_to_predict[1]:
-            eff_BA = 0.9 - i * 0.02
-            eff_BD = 0.6 + i * 0.01
-            if Sorted_Ranking[i][2] < Sorted_Ranking[i][3]:
-                eff_BA += 0.05
-
-    eff = [eff_AH, eff_BA]
-    eff_D = [eff_AD, eff_BD]
 
     # read results 4 last team matches
     Teams_Matches = [0, 0]
@@ -127,78 +42,77 @@ def main():
         Matches.reverse()
         del Matches[4:]
         Teams_Matches[j] = Matches
-    # print(Teams_Matches)
+    print(Teams_Matches)
 
     # ------------------------------------------------------------------
-    # TODO Model i dobór parametrów (2/5)
-    # TODO Czy krawędzie w drugą stronę nie byłyby bardziej intuicyjne?
 
     # Create the model with edges specified as tuples (parent, child)
     edges = []
     for i in range(2):
-        edges.append(('Team' + str(i), 'Efficiency' + str(i)))
-        edges.append(('Team' + str(i), 'Run' + str(i)))
-        edges.append(('Team' + str(i), 'Venue' + str(i)))
+        edges.append(('Eff_0' + str(i), 'Eff_prev' + str(i)))
+        edges.append(('Eff_prev' + str(i), 'Eff_curr' + str(i)))
+        edges.append(('Eff_curr' + str(i), 'Eff_predict' + str(i)))
 
-        for j in range(4):
-            edges.append(('Run' + str(i), 'Match' + str(i) + str(j)))
+        edges.append(('Eff_prev' + str(i), 'Result_prev' + str(i)))
+        edges.append(('Eff_curr' + str(i), 'Result_curr' + str(i)))
 
     football_model = BayesianModel(edges)
 
     # Create tabular CPDs, values has to be 2-D array
-    cpd_run = []
-    cpd_efficiency = []
-    cpd_venue = []
-    cpd_team = []
-    cpd_match = []
+    cpd_e0 = []
+    cpd_eff_prev = []
+    cpd_eff_curr = []
+    cpd_eff_predict = []
+
+    cpd_result_prev = []
+    cpd_result_curr = []
 
     for i in range(2):
-        cpd_run.append(TabularCPD('Run' + str(i), 3, [[0.75, 0.1], [0.05, 0.1], [0.2, 0.8]], evidence=['Team' + str(i)],
-                                  evidence_card=[2]))
+        cpd_e0.append(TabularCPD(variable='Eff_0' + str(i),
+                                 variable_card=2,
+                                 values=[[0.6], [0.4]]))
 
-        cpd_efficiency.append(
-            TabularCPD('Efficiency' + str(i), 2, [[eff[i], eff_D[i]], [1 - eff[i], 1 - eff_D[i]]],
-                       evidence=['Team' + str(i)],
-                       evidence_card=[2]))
+        cpd_eff_prev.append(TabularCPD(variable='Eff_prev' + str(i),
+                                       variable_card=2,
+                                       values=[[0.7, 0.3], [0.3, 0.7]],
+                                       evidence=['Eff_0' + str(i)],
+                                       evidence_card=[2]))
 
-        cpd_venue.append(TabularCPD('Venue' + str(i), 2, [[0.55, 0.45], [0.45, 0.55]], evidence=['Team' + str(i)],
-                                    evidence_card=[2]))
-        cpd_team.append(TabularCPD('Team' + str(i), 2, [[0.5], [0.5]]))
+        cpd_eff_curr.append(TabularCPD(variable='Eff_curr' + str(i),
+                                       variable_card=2,
+                                       values=[[0.7, 0.3], [0.3, 0.7]],
+                                       evidence=['Eff_prev' + str(i)],
+                                       evidence_card=[2]))
 
-        for j in range(4):
-            cpd_match.append(
-                TabularCPD('Match' + str(i) + str(j), 3,
-                           [[0.6 - i * 0.05, 0.1 + i * 0.05, 0.3], [0.2 + i * 0.05, 0.6 - i * 0.05, 0.3],
-                            [0.2, 0.3, 0.4]],
-                           evidence=['Run' + str(i)],
-                           evidence_card=[3]))
+        cpd_eff_predict.append(TabularCPD(variable='Eff_predict' + str(i),
+                                          variable_card=2,
+                                          values=[[0.7, 0.3], [0.3, 0.7]],
+                                          evidence=['Eff_curr' + str(i)],
+                                          evidence_card=[2]))
+
+        cpd_result_prev.append(TabularCPD(variable='Result_prev' + str(i),
+                                          variable_card=3,
+                                          values=[[0.9, 0.1], [0.0, 0.1], [0.1, 0.8]],
+                                          evidence=['Eff_prev' + str(i)],
+                                          evidence_card=[2]))
+
+        cpd_result_curr.append(TabularCPD(variable='Result_curr' + str(i),
+                                          variable_card=3,
+                                          values=[[0.9, 0.1], [0.0, 0.1], [0.1, 0.8]],
+                                          evidence=['Eff_curr' + str(i)],
+                                          evidence_card=[2]))
 
     # Add CPDs to model
-    football_model.add_cpds(*cpd_run, *cpd_efficiency, *cpd_venue, *cpd_team, *cpd_match)
+    football_model.add_cpds(*cpd_e0, *cpd_eff_prev, *cpd_eff_curr, *cpd_eff_predict, *cpd_result_prev, *cpd_result_curr)
 
-    # print('Check model :', football_model.check_model())
-
+    print('Check model :', football_model.check_model())
     # Initialize inference algorithm
     football_infer = VariableElimination(football_model)
 
-    # TODO Co oznaczają zmienne 'Efficiency' i 'Venue' jeśli nie są obserwowane?
-    qH = football_infer.query(['Team0'], evidence=make_dictH(Teams_Matches), show_progress=False)
-    winH = qH.values[0]
-    drawH = qH.values[1]
-
-    qA = football_infer.query(['Team1'], evidence=make_dictA(Teams_Matches), show_progress=False)
-    winA = qA.values[0]
-    drawA = qA.values[1]
-
-    sub = abs(winH - winA)
-
-    # preset results
-    if drawH > 0.4 and drawA > 0.4 or sub < 0.15:
-        print("D")
-    elif winH > winA and sub > 0.15:
-        print("H")
-    elif winA > winH and sub > 0.15:
-        print("A")
+    qH = football_infer.query(['Eff_predict0'], evidence={'Result_prev0': 1, 'Result_curr0': 2}, show_progress=False)
+    print('P(Eff_predict0|Results=\n', qH)
+    qA = football_infer.query(['Eff_predict1'], evidence={'Result_prev1': 1, 'Result_curr1': 1}, show_progress=False)
+    print('P(Eff_predict1|Results=\n', qA)
 
 
 if __name__ == '__main__':
