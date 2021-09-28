@@ -6,6 +6,18 @@ from pgmpy.models import BayesianModel
 from pgmpy.factors.discrete import TabularCPD
 from pgmpy.inference import VariableElimination
 
+# TODO Jakość kodu (1.5/2)
+
+# TODO Model i dobór parametrów (3/5)
+
+# TODO Skuteczność 0.497 (1.5/3)
+# TODO [0.56, 1.00] - 3.0
+# TODO [0.53, 0.56) - 2.5
+# TODO [0.50, 0.53) - 2.0
+# TODO [0.47, 0.50) - 1.5
+# TODO [0.44, 0.47) - 1.0
+# TODO [0.41, 0.44) - 0.5
+# TODO [0.00, 0.41) - 0.0
 
 def main():
     date = input()
@@ -98,6 +110,7 @@ def main():
 
     # ------------------------------------------------------------------------------
     # Create the model with edges specified as tuples (parent, child)
+    # TODO Można by to zrobić dla całego sezonu, a nie tylko dla dwóch ostatnich meczy.
     edges = []
     for i in range(2):
         edges.append(('Eff_0' + str(i), 'Eff_prev' + str(i)))
