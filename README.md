@@ -1,4 +1,4 @@
-# Anna Kettner (136566) RISA
+# Football Predictions
 
 Projekt polega na stworzeniu systemu przewidującego wyniki meczów piłki nożnej wykorzystującego probabilistyczne modele grafowe. System ma przewidywać jaki będzie wynik następnego meczu, mając do dyspozycji wyniki już rozegranych meczy.
 
